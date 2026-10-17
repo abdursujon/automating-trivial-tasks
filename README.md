@@ -9,8 +9,25 @@ A script that runs automatically when the PC starts up and opens:
 - VS Code
 - Spotify
 - Blackboard
-- Terminal
-- Focus timer (3-hour session, 1-hour break, with an audible alarm at the end of each)
+- Focus timer 
+Monday - Friday 
+The timer will display 4 buttons
+1. One with 3 hour with display name "FYP: 3h" 
+2. One with 3 hour with display name "Other Modules: 3h"
+3. One with 2 hour name "Standout"
+4. One with 1 hour name "Job Application"
+
+Saturday - Sunday
+1. One with 3 hour "Standout"
+2. One with 2 hour "Job Appliacation"
+
+After each timer finish, I will have 5 button which will have break time 
+1. 15 min break button 
+2. 30 min break button 
+3. 45 
+4. 60 
+5. or skip: if i press skip the display should show me all the option of different timer button depends on the day 
+
 
 **Purpose:** Save time during project setup and minimize distractions.
 
