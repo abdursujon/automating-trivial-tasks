@@ -13,6 +13,19 @@ WEEKDAY_FOCUS_SESSIONS = [
     ("Standout", 2 * 60 * 60),
     ("Job Application", 1 * 60 * 60),
 ]
+WEEKDAY_CHECKLIST_ITEMS = [
+    ("FYP: 3h", "3 Hour Final Year Project"),
+    ("Other Modules: 3h", "3 Hour Other Modules"),
+    ("Standout", "2 Hour Standout"),
+    ("Job Application", "1 Hour Job Application"),
+]
+
+DONE_COLOUR = "#7f8c8d"
+
+WEEKEND_CHECKLIST_ITEMS = [
+    ("Standout", "3 Hour Standout"),
+    ("Job Application", "2 Hour Job Application"),
+]
 
 WEEKEND_FOCUS_SESSIONS = [
     ("Standout", 3 * 60 * 60),
@@ -31,6 +44,11 @@ BACKGROUND_COLOUR = "#2c3e50"
 FOCUS_COLOUR = "#27ae60"
 BREAK_COLOUR = "#e67e22"
 CLOCK_COLOUR = "#3498db"
+TEST_DATE_OVERRIDE = None  # e.g. datetime.date(2026, 10, 17) for a Saturday
+
+def getTodayOrTestOverrideDate():
+    """Return the test override date when set, otherwise today's date"""
+    return TEST_DATE_OVERRIDE or datetime.date.today()
 
 def launch_startup_applications():
     """Launch the desired application when PC is turned on"""
@@ -71,18 +89,27 @@ def playAlarmSoundInBackground():
 
 def getFocusSessionsForToday():
     """Return the weekday or weekend focus sessions based on today's date"""
-    is_weekend = datetime.date.today().weekday() >= 5
+    is_weekend = getTodayOrTestOverrideDate().weekday() >= 5
     return WEEKEND_FOCUS_SESSIONS if is_weekend else WEEKDAY_FOCUS_SESSIONS
+
+def getChecklistItemsForToday():
+    """Return the weekday or weekend checklist items based on today's date"""
+    is_weekend = getTodayOrTestOverrideDate().weekday() >= 5
+    return WEEKEND_CHECKLIST_ITEMS if is_weekend else WEEKDAY_CHECKLIST_ITEMS
 
 def start_focus_timer_window():
     """Pick a focus session, count it down, then pick a break"""
     root = tk.Tk()
     root.title("Focus Session")
-    root.geometry("900x400")
+    root.geometry("900x600")
     root.configure(bg=BACKGROUND_COLOUR)
 
     day_label = tk.Label(root, text="", font=("Arial", 18), fg=CLOCK_COLOUR, bg=BACKGROUND_COLOUR)
     day_label.pack(pady=(20, 0))
+
+    checklist_frame = tk.Frame(root, bg=BACKGROUND_COLOUR)
+    checklist_frame.pack(pady=10)
+
     status_label = tk.Label(root, text="", font=("Arial", 24), fg=FOCUS_COLOUR, bg=BACKGROUND_COLOUR)
     status_label.pack(pady=(10, 10))
 
@@ -93,6 +120,35 @@ def start_focus_timer_window():
     button_frame.pack(pady=20)
 
     pending_countdown_id = None
+    completed_session_names = set()
+    completed_sessions_date = getTodayOrTestOverrideDate()
+    running_focus_session_name = None
+
+    def markRunningFocusSessionAsCompleted():
+        nonlocal running_focus_session_name
+        if running_focus_session_name is not None:
+            completed_session_names.add(running_focus_session_name)
+            running_focus_session_name = None
+        refreshChecklistLabels()
+
+    def resetCompletedSessionsWhenDayChanges():
+        nonlocal completed_sessions_date
+        if getTodayOrTestOverrideDate() != completed_sessions_date:
+            completed_session_names.clear()
+            completed_sessions_date = getTodayOrTestOverrideDate()
+
+    def refreshChecklistLabels():
+        for checklist_label in checklist_frame.winfo_children():
+            checklist_label.destroy()
+        for item_number, (session_name, checklist_text) in enumerate(getChecklistItemsForToday(), start=1):
+            is_completed = session_name in completed_session_names
+            tk.Label(
+                checklist_frame,
+                text=f"{item_number}. {checklist_text}" + ("  ✓ Done" if is_completed else ""),
+                font=("Arial", 16, "overstrike") if is_completed else ("Arial", 16),
+                fg=DONE_COLOUR if is_completed else "white",
+                bg=BACKGROUND_COLOUR,
+            ).pack(anchor="w")
 
     def cancelPendingCountdown():
         nonlocal pending_countdown_id
@@ -112,19 +168,22 @@ def start_focus_timer_window():
 
     def endCountdownAndShowFocusSessions():
         cancelPendingCountdown()
+        markRunningFocusSessionAsCompleted()
         show_focus_session_buttons()
 
     def removeAllButtonsFromFrame():
         for button in button_frame.winfo_children():
             button.destroy()
 
-    def addButtonsToFrame(label_and_seconds_pairs, on_button_clicked):
+    def addButtonsToFrame(label_and_seconds_pairs, on_button_clicked, completed_button_texts=()):
         removeAllButtonsFromFrame()
         for column_index, (button_text, duration_seconds) in enumerate(label_and_seconds_pairs):
+            is_completed = button_text in completed_button_texts
             tk.Button(
                 button_frame,
                 text=button_text,
-                font=("Arial", 14),
+                font=("Arial", 14, "overstrike") if is_completed else ("Arial", 14),
+                fg=DONE_COLOUR if is_completed else "black",
                 width=16,
                 command=lambda text=button_text, seconds=duration_seconds: on_button_clicked(text, seconds),
             ).grid(row=0, column=column_index, padx=8)
@@ -139,22 +198,27 @@ def start_focus_timer_window():
         pending_countdown_id = root.after(1000, countdown_then_call, seconds_left - 1, on_finished)
 
     def show_focus_session_buttons():
-        day_label.config(text=datetime.date.today().strftime("%A"))
+        resetCompletedSessionsWhenDayChanges()
+        refreshChecklistLabels()
+        day_label.config(text=getTodayOrTestOverrideDate().strftime("%A"))
         status_label.config(text="Choose a focus session", fg=FOCUS_COLOUR)
         clock_label.config(text="")
-        addButtonsToFrame(getFocusSessionsForToday(), start_focus_session_countdown)
+        addButtonsToFrame(getFocusSessionsForToday(), start_focus_session_countdown, completed_session_names)
 
     def start_focus_session_countdown(session_name, session_seconds):
+        nonlocal running_focus_session_name
+        running_focus_session_name = session_name
         addEndButtonThatReturnsToFocusSessions()
         status_label.config(text=f"Focus: {session_name}", fg=FOCUS_COLOUR)
         countdown_then_call(session_seconds, show_break_buttons_after_focus)
 
     def show_break_buttons_after_focus():
+        markRunningFocusSessionAsCompleted()
         playAlarmSoundInBackground()
         status_label.config(text="Session complete. Choose a break", fg=BREAK_COLOUR)
         addButtonsToFrame(BREAK_OPTIONS + [("Skip", 0)], start_break_countdown_or_skip)
 
-    def start_break_countdown_or_skip(break_name, break_secon):
+    def start_break_countdown_or_skip(break_name, break_seconds):
         if break_seconds == 0:
             show_focus_session_buttons()
             return

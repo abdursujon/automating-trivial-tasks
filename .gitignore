@@ -1,0 +1,17 @@
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Editors
+.vscode/
+.idea/
+
+# OS
+.DS_Store
