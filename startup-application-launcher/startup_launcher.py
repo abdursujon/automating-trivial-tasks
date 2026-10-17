@@ -8,15 +8,16 @@ ALARM_SOUND_PATH = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga
 ALARM_REPEAT_COUNT = 2
 
 WEEKDAY_FOCUS_SESSIONS = [
-    ("FYP: 3h", 3 * 60 * 60),
-    ("Other Modules: 3h", 3 * 60 * 60),
-    ("Standout", 2 * 60 * 60),
+    ("FYP", 3 * 60 * 60),
+    ("Other Modules", 3 * 60 * 60),
+    ("Standout No AI", 2 * 60 * 60),
     ("Job Application", 1 * 60 * 60),
 ]
+
 WEEKDAY_CHECKLIST_ITEMS = [
-    ("FYP: 3h", "3 Hour Final Year Project"),
+    ("FYP", "3 Hour Final Year Project"),
     ("Other Modules: 3h", "3 Hour Other Modules"),
-    ("Standout", "2 Hour Standout"),
+    ("Standout", "Work 2 hour on standout list no AI allowed"),
     ("Job Application", "1 Hour Job Application"),
 ]
 
