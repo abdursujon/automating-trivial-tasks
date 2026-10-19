@@ -16,8 +16,8 @@ WEEKDAY_FOCUS_SESSIONS = [
 
 WEEKDAY_CHECKLIST_ITEMS = [
     ("FYP", "3 Hour Final Year Project"),
-    ("Other Modules: 3h", "3 Hour Other Modules"),
-    ("Standout", "Work 2 hour on standout list no AI allowed"),
+    ("Other Modules", "3 Hour Other Modules"),
+    ("Standout No AI", "Work 2 hour on standout list no AI allowed"),
     ("Job Application", "1 Hour Job Application"),
 ]
 
