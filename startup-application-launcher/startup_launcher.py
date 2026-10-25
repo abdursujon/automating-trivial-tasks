@@ -8,30 +8,33 @@ ALARM_SOUND_PATH = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga
 ALARM_REPEAT_COUNT = 2
 
 WEEKDAY_FOCUS_SESSIONS = [
-    ("FYP", 3 * 60 * 60),
-    ("Other Modules", 3 * 60 * 60),
-    ("Standout No AI", 2 * 60 * 60),
-    ("Job Application", 1 * 60 * 60),
+    ("1. FYP 3H", 3 * 60 * 60),
+    ("2. Deep Learning 2H", 2 * 60 * 60),
+    ("3. Other Module 3H", 3 * 60 * 60),
+    ("4. Problem Solving 1H", 1 * 60 * 60),
+    ("5. 2 Job Application 1H", 1 * 60 * 60),
 ]
 
 WEEKDAY_CHECKLIST_ITEMS = [
-    ("FYP", "3 Hour Final Year Project"),
-    ("Other Modules", "3 Hour Other Modules"),
-    ("Standout No AI", "Work 2 hour on standout list no AI allowed"),
-    ("Job Application", "1 Hour Job Application"),
+    "1. FYP 3H",
+    "2. Deep Learning 2H",
+    "3. Other Module 3H",
+    "4. Problem Solving 1H",
+    "5. 2 Job Application 1H",
 ]
 
 DONE_COLOUR = "#7f8c8d"
 
-WEEKEND_CHECKLIST_ITEMS = [
-    ("Standout", "3 Hour Standout"),
-    ("Job Application", "2 Hour Job Application"),
+SUNDAY_CHECKLIST_ITEMS = [
+    "1. 4 Job Application 2H",
+    "2. 2 Hour Problem Solving",
+    "3. Extra Uni Work 2H",
 ]
 
-WEEKEND_FOCUS_SESSIONS = [
-    ("Standout", 3 * 60 * 60),
-    ("Job Application", 2 * 60 * 60),
-    ("Uni work", 2 * 60 * 60),
+SUNDAY_FOCUS_SESSIONS = [
+    ("1. 4 Job Application 2H", 2 * 60 * 60),
+    ("2. 2 Hour Problem Solving", 2 * 60 * 60),
+    ("3. Extra Uni Work 2H", 2 * 60 * 60),
 ]
 
 BREAK_OPTIONS = [
@@ -56,7 +59,6 @@ def launch_startup_applications():
     apps = [
         "code",
         "brave-browser https://open.spotify.com/",
-        "brave-browser https://blackboard.salford.ac.uk/ultra"
     ]
 
     for app in apps:
@@ -88,15 +90,26 @@ def playAlarmSoundInBackground():
     """Play the alarm on a separate thread so the window stays responsive"""
     threading.Thread(target=playAlarmSoundRepeatedly, daemon=True).start()
 
+SATURDAY_WEEKDAY_NUMBER = 5
+SUNDAY_WEEKDAY_NUMBER = 6
+
+def isTodaySaturdayDayOff():
+    """Return True when today is Saturday, which has no focus sessions"""
+    return getTodayOrTestOverrideDate().weekday() == SATURDAY_WEEKDAY_NUMBER
+
 def getFocusSessionsForToday():
-    """Return the weekday or weekend focus sessions based on today's date"""
-    is_weekend = getTodayOrTestOverrideDate().weekday() >= 5
-    return WEEKEND_FOCUS_SESSIONS if is_weekend else WEEKDAY_FOCUS_SESSIONS
+    """Return the weekday or Sunday focus sessions, or none on Saturday"""
+    weekday_number = getTodayOrTestOverrideDate().weekday()
+    if weekday_number == SATURDAY_WEEKDAY_NUMBER:
+        return []
+    return SUNDAY_FOCUS_SESSIONS if weekday_number == SUNDAY_WEEKDAY_NUMBER else WEEKDAY_FOCUS_SESSIONS
 
 def getChecklistItemsForToday():
-    """Return the weekday or weekend checklist items based on today's date"""
-    is_weekend = getTodayOrTestOverrideDate().weekday() >= 5
-    return WEEKEND_CHECKLIST_ITEMS if is_weekend else WEEKDAY_CHECKLIST_ITEMS
+    """Return the weekday or Sunday checklist items, or none on Saturday"""
+    weekday_number = getTodayOrTestOverrideDate().weekday()
+    if weekday_number == SATURDAY_WEEKDAY_NUMBER:
+        return []
+    return SUNDAY_CHECKLIST_ITEMS if weekday_number == SUNDAY_WEEKDAY_NUMBER else WEEKDAY_CHECKLIST_ITEMS
 
 def start_focus_timer_window():
     """Pick a focus session, count it down, then pick a break"""
@@ -124,13 +137,15 @@ def start_focus_timer_window():
     completed_session_names = set()
     completed_sessions_date = getTodayOrTestOverrideDate()
     running_focus_session_name = None
+    countdown_seconds_left = 0
+    countdown_on_finished = None
+    is_countdown_paused = False
 
     def markRunningFocusSessionAsCompleted():
         nonlocal running_focus_session_name
         if running_focus_session_name is not None:
             completed_session_names.add(running_focus_session_name)
             running_focus_session_name = None
-        refreshChecklistLabels()
 
     def resetCompletedSessionsWhenDayChanges():
         nonlocal completed_sessions_date
@@ -138,16 +153,15 @@ def start_focus_timer_window():
             completed_session_names.clear()
             completed_sessions_date = getTodayOrTestOverrideDate()
 
-    def refreshChecklistLabels():
+    def refreshNumberedChecklistLabels():
         for checklist_label in checklist_frame.winfo_children():
             checklist_label.destroy()
-        for item_number, (session_name, checklist_text) in enumerate(getChecklistItemsForToday(), start=1):
-            is_completed = session_name in completed_session_names
+        for checklist_text in getChecklistItemsForToday():
             tk.Label(
                 checklist_frame,
-                text=f"{item_number}. {checklist_text}" + ("  ✓ Done" if is_completed else ""),
-                font=("Arial", 16, "overstrike") if is_completed else ("Arial", 16),
-                fg=DONE_COLOUR if is_completed else "white",
+                text=checklist_text,
+                font=("Arial", 16),
+                fg="white",
                 bg=BACKGROUND_COLOUR,
             ).pack(anchor="w")
 
@@ -158,14 +172,35 @@ def start_focus_timer_window():
             pending_countdown_id = None
 
     def addEndButtonThatReturnsToFocusSessions():
+        nonlocal is_countdown_paused
+        is_countdown_paused = False
         removeAllButtonsFromFrame()
+        pause_button = tk.Button(
+            button_frame,
+            text="Pause",
+            font=("Arial", 14),
+            width=16,
+        )
+        pause_button.config(command=lambda: togglePauseOrContinueCountdown(pause_button))
+        pause_button.grid(row=0, column=0, padx=8)
         tk.Button(
             button_frame,
             text="End",
             font=("Arial", 14),
             width=16,
             command=endCountdownAndShowFocusSessions,
-        ).grid(row=0, column=0, padx=8)
+        ).grid(row=0, column=1, padx=8)
+
+    def togglePauseOrContinueCountdown(pause_button):
+        nonlocal is_countdown_paused
+        if is_countdown_paused:
+            is_countdown_paused = False
+            pause_button.config(text="Pause")
+            countdown_then_call(countdown_seconds_left, countdown_on_finished)
+        else:
+            is_countdown_paused = True
+            cancelPendingCountdown()
+            pause_button.config(text="Continue")
 
     def endCountdownAndShowFocusSessions():
         cancelPendingCountdown()
@@ -190,7 +225,9 @@ def start_focus_timer_window():
             ).grid(row=0, column=column_index, padx=8)
 
     def countdown_then_call(seconds_left, on_finished):
-        nonlocal pending_countdown_id
+        nonlocal pending_countdown_id, countdown_seconds_left, countdown_on_finished
+        countdown_seconds_left = seconds_left
+        countdown_on_finished = on_finished
         clock_label.config(text=formatSecondsAsClockText(seconds_left))
         if seconds_left <= 0:
             pending_countdown_id = None
@@ -200,9 +237,12 @@ def start_focus_timer_window():
 
     def show_focus_session_buttons():
         resetCompletedSessionsWhenDayChanges()
-        refreshChecklistLabels()
+        refreshNumberedChecklistLabels()
         day_label.config(text=getTodayOrTestOverrideDate().strftime("%A"))
-        status_label.config(text="Choose a focus session", fg=FOCUS_COLOUR)
+        status_label.config(
+            text="Day off" if isTodaySaturdayDayOff() else "Choose a focus session",
+            fg=FOCUS_COLOUR,
+        )
         clock_label.config(text="")
         addButtonsToFrame(getFocusSessionsForToday(), start_focus_session_countdown, completed_session_names)
 
